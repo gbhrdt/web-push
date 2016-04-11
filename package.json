@@ -27,7 +27,7 @@
   "dependencies": {
     "asn1.js": "^4.5.2",
     "colors": "^1.1.2",
-    "http_ece": "https://github.com/martinthomson/encrypted-content-encoding/tarball/982deab65cf457b59bdb0a7279fb77ae5045d2ed",
+    "http_ece": "https://github.com/gbhrdt/encrypted-content-encoding/tarball/33e87d54ce94297f4a560249f77fe1ef4624470d",
     "jws": "^3.1.3",
     "urlsafe-base64": "^1.0.0"
   },
