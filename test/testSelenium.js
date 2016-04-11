@@ -36,7 +36,7 @@ suite('selenium', function() {
 
   this.timeout(180000);
 
-  var firefoxStableBinaryPath, firefoxBetaBinaryPath, firefoxNightlyBinaryPath, chromeBinaryPath;
+  var firefoxStableBinaryPath, firefoxBetaBinaryPath, firefoxAuroraBinaryPath, firefoxNightlyBinaryPath, chromeBinaryPath;
   var server, driver;
 
   function runTest(params) {
@@ -46,6 +46,10 @@ suite('selenium', function() {
     } else if (params.browser === 'firefox-beta') {
       params.browser = 'firefox';
       firefoxBinaryPath = firefoxBetaBinaryPath;
+    } else if (params.browser === 'firefox-aurora') {
+      params.browser = 'firefox';
+      firefoxBinaryPath = firefoxAuroraBinaryPath;
+      process.env.SELENIUM_MARIONETTE = true;
     }
 
     process.env.SELENIUM_BROWSER = params.browser;
@@ -54,9 +58,7 @@ suite('selenium', function() {
     .then(function(newServer) {
       server = newServer;
 
-      var profilePath = temp.mkdirSync('marco');
-
-      var profile = new firefox.Profile(profilePath);
+      var profile = new firefox.Profile();
       profile.setPreference('security.turn_off_all_security_so_that_viruses_can_take_over_this_computer', true);
       profile.setPreference('extensions.checkCompatibility.nightly', false);
       // Only allow installation of third-party addons from the user's profile dir (needed to block the third-party
@@ -72,7 +74,7 @@ suite('selenium', function() {
       var chromeOptions = new chrome.Options()
         .setChromeBinaryPath(chromeBinaryPath)
         .addArguments('--no-sandbox')
-        .addArguments('user-data-dir=' + profilePath);
+        .addArguments('user-data-dir=' + temp.mkdirSync('marco'));
 
       var builder = new webdriver.Builder()
         .forBrowser('firefox')
@@ -91,11 +93,6 @@ suite('selenium', function() {
       }, server.port);
 
       driver.get('http://127.0.0.1:' + server.port);
-
-      driver.executeScript(function(port) {
-        serverAddress = 'http://127.0.0.1:' + port;
-        go();
-      }, server.port);
 
       return driver.wait(webdriver.until.titleIs(params.payload ? params.payload : 'no payload'), 60000);
     });
@@ -121,6 +118,14 @@ suite('selenium', function() {
     }
 
     promises.push(seleniumInit.downloadFirefoxBeta());
+
+    /*if (process.platform === 'linux') {
+      firefoxAuroraBinaryPath = 'test_tools/aurora/firefox/firefox-bin';
+    } else if (process.platform === 'darwin') {
+      firefoxAuroraBinaryPath = 'test_tools/aurora/Firefox.app/Contents/MacOS/firefox-bin';
+    }
+
+    promises.push(seleniumInit.downloadFirefoxAurora());*/
 
     if (process.platform === 'linux') {
       firefoxNightlyBinaryPath = 'test_tools/firefox/firefox-bin';
@@ -154,8 +159,10 @@ suite('selenium', function() {
 
       try {
         console.log('Using Firefox: ' + firefoxStableBinaryPath);
-        console.log('Version: ' + childProcess.execSync(firefoxStableBinaryPath + ' --version'));
-        console.log('Beta Version: ' + childProcess.execSync(firefoxBetaBinaryPath + ' --version'));
+        console.log('Version: ' + childProcess.execSync(firefoxStableBinaryPath + ' --version').toString().replace('\n', ''));
+        console.log('Beta Version: ' + childProcess.execSync(firefoxBetaBinaryPath + ' --version').toString().replace('\n', ''));
+        //console.log('Aurora Version: ' + childProcess.execSync(firefoxAuroraBinaryPath + ' --version').toString().replace('\n', ''));
+        console.log('Nightly Version: ' + childProcess.execSync(firefoxNightlyBinaryPath + ' --version').toString().replace('\n', ''));
       } catch (e) {}
 
       if (process.env.GCM_API_KEY && !fs.existsSync(chromeBinaryPath)) {
@@ -164,7 +171,7 @@ suite('selenium', function() {
 
       try {
         console.log('Using Chromium: ' + chromeBinaryPath);
-        console.log('Version: ' + childProcess.execSync(chromeBinaryPath + ' --version'));
+        console.log('Version: ' + childProcess.execSync(chromeBinaryPath + ' --version').toString().replace('\n', ''));
       } catch (e) {}
     });
   });
@@ -252,15 +259,13 @@ suite('selenium', function() {
     });
   }
 
-  /*
-  XXX: Currently broken, see https://github.com/mozilla-services/autopush/issues/426.
   test('send/receive notification with payload & vapid with Firefox Beta', function() {
     return runTest({
       browser: 'firefox-beta',
       payload: 'marco',
       vapid: vapidParam,
     });
-  });*/
+  });
 
   if (process.env.GCM_API_KEY && process.env.TRAVIS_OS_NAME !== 'osx') {
     test('send/receive notification with payload & vapid with Chrome', function() {

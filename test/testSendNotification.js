@@ -84,17 +84,9 @@ suite('sendNotification', function() {
                 salt: salt,
                 padSize: 1,
               });
-            } else if (req.headers['content-encoding'] === 'aesgcm128') {
-              ece.saveKey('webpushKey', userCurve, 'P-256');
+            } else if (cryptoHeader === 'crypto-key') {
+              assert.equal(req.headers['content-encoding'], 'aesgcm', 'Content-Encoding header correct');
 
-              var decrypted = ece.decrypt(body, {
-                keyid: 'webpushKey',
-                dh: appServerPublicKey,
-                salt: salt,
-                authSecret: urlBase64.encode(intermediateUserAuth),
-                padSize: 1,
-              });
-            } else if (req.headers['content-encoding'] === 'aesgcm') {
               ece.saveKey('webpushKey', userCurve, 'P-256');
 
               var decrypted = ece.decrypt(body, {
@@ -105,7 +97,7 @@ suite('sendNotification', function() {
                 padSize: 2,
               });
             } else {
-              assert(false, 'Invalid crypto header or content-encoding header value');
+              assert(false, 'Invalid crypto header value');
             }
           } else {
             assert.equal(req.headers[cryptoHeader].indexOf('keyid=p256dh;dh='), 0, 'Encryption-Key header correct');
@@ -202,12 +194,12 @@ suite('sendNotification', function() {
     });
   });
 
-  test('send/receive string (intermediate standard)', function() {
+  test('send/receive string (new standard)', function() {
     return startServer('hello')
     .then(function() {
       return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
         userPublicKey: urlBase64.encode(userPublicKey),
-        userAuth: urlBase64.encode(intermediateUserAuth),
+        userAuth: urlBase64.encode(userAuth),
         payload: 'hello',
       });
     })
@@ -219,12 +211,12 @@ suite('sendNotification', function() {
     });
   });
 
-  test('send/receive string (new standard)', function() {
+  test('send/receive string (non-urlsafe base64)', function() {
     return startServer('hello')
     .then(function() {
       return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
-        userPublicKey: urlBase64.encode(userPublicKey),
-        userAuth: urlBase64.encode(userAuth),
+        userPublicKey: userPublicKey.toString('base64'),
+        userAuth: userAuth.toString('base64'),
         payload: 'hello',
       });
     })
@@ -421,6 +413,71 @@ suite('sendNotification', function() {
     });
   });
 
+  test('userPublicKey argument isn\'t a string', function() {
+    return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
+      userPublicKey: userPublicKey,
+      userAuth: urlBase64.encode(userAuth),
+      payload: 'hello',
+    })
+    .then(function(body) {
+      assert(false, 'sendNotification promise resolved');
+    }, function() {
+      assert(true, 'sendNotification promise rejected');
+    });
+  });
+
+  test('userAuth argument isn\'t a string', function() {
+    return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
+      userPublicKey: urlBase64.encode(userPublicKey),
+      userAuth: userAuth,
+      payload: 'hello',
+    })
+    .then(function(body) {
+      assert(false, 'sendNotification promise resolved');
+    }, function() {
+      assert(true, 'sendNotification promise rejected');
+    });
+  });
+
+  test('userPublicKey argument is too long', function() {
+    return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
+      userPublicKey: urlBase64.encode(Buffer.concat([ userPublicKey, new Buffer(1) ])),
+      userAuth: urlBase64.encode(userAuth),
+      payload: 'hello',
+    })
+    .then(function(body) {
+      assert(false, 'sendNotification promise resolved');
+    }, function() {
+      assert(true, 'sendNotification promise rejected');
+    });
+  });
+
+  test('userPublicKey argument is too short', function() {
+    return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
+      userPublicKey: urlBase64.encode(userPublicKey.slice(1)),
+      userAuth: urlBase64.encode(userAuth),
+      payload: 'hello',
+    })
+    .then(function(body) {
+      assert(false, 'sendNotification promise resolved');
+    }, function() {
+      assert(true, 'sendNotification promise rejected');
+    });
+  });
+
+  test('userAuth argument is too short', function() {
+    return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
+      userPublicKey: urlBase64.encode(userPublicKey),
+      userAuth: urlBase64.encode(userAuth.slice(1)),
+      payload: 'hello',
+    })
+    .then(function(body) {
+      assert(false, 'sendNotification promise resolved');
+    }, function() {
+      assert(true, 'sendNotification promise rejected');
+    });
+  });
+
   test('TTL with old interface', function() {
     return startServer(undefined, 5)
     .then(function() {
@@ -451,29 +508,6 @@ suite('sendNotification', function() {
     .then(function() {
       return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
         userPublicKey: urlBase64.encode(userPublicKey),
-        payload: 'hello',
-        vapid: {
-          audience: 'https://www.mozilla.org/',
-          subject: 'mailto:mozilla@example.org',
-          privateKey: vapidKeys.privateKey,
-          publicKey: vapidKeys.publicKey,
-        },
-      });
-    })
-    .then(function(body) {
-      assert(true, 'sendNotification promise resolved');
-      assert.equal(body, 'ok');
-    }, function(e) {
-      assert(false, 'sendNotification promise rejected with ' + e);
-    });
-  });
-
-  test('send notification with message (intermediate standard) with vapid', function() {
-    return startServer('hello', undefined, undefined, undefined, true)
-    .then(function() {
-      return webPush.sendNotification('https://127.0.0.1:' + serverPort, {
-        userPublicKey: urlBase64.encode(userPublicKey),
-        userAuth: urlBase64.encode(intermediateUserAuth),
         payload: 'hello',
         vapid: {
           audience: 'https://www.mozilla.org/',
